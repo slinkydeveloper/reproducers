@@ -17,7 +17,6 @@ import io.vertx.ext.web.sstore.LocalSessionStore
 
 class HttpVerticle(var oAuthInstance: TestOAuth) : AbstractVerticle() {
 
-    private val log = LoggerFactory.getLogger(HttpVerticle::class.java)
     private lateinit var config: JsonObject
 
     override fun init(vertx: Vertx?, context: Context?) {
@@ -41,7 +40,7 @@ class HttpVerticle(var oAuthInstance: TestOAuth) : AbstractVerticle() {
 
         router.route().handler { routingContext ->
 
-            log.info("responding to path {0}", routingContext.request().path())
+            println("responding to path ${routingContext.request().path()}")
             // This handler will be called for every request
             val response = routingContext.response()
             response.putHeader("content-type", "text/plain")
@@ -61,11 +60,16 @@ class HttpVerticle(var oAuthInstance: TestOAuth) : AbstractVerticle() {
         sessionHandler.setCookieHttpOnlyFlag(true)
         router.route().handler(sessionHandler)
 
-        // We need a user session handler too to make sure
-        // the user is stored in the session between requests
-        router.route().handler(UserSessionHandler.create(authProvider))
+        oauth2.setupCallback(router.route("/callback").handler { routingContext ->
 
-        oauth2.setupCallback(router.route())
+            println("responding to path ${routingContext.request().path()}")
+            // This handler will be called for every request
+            val response = routingContext.response()
+            response.putHeader("content-type", "text/plain")
+
+            // Write to the response and end it
+            response.end("Hello World from Vert.x-Web!")
+        })
         router.route(path).handler(oauth2)
     }
 

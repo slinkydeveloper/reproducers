@@ -1,9 +1,10 @@
 package io.javathought.vertx.ServerTest
 
-
+import io.vertx.core.http.HttpHeaders
 import io.vertx.core.logging.LoggerFactory
 import io.vertx.ext.auth.oauth2.OAuth2Auth
 import io.vertx.ext.auth.oauth2.OAuth2FlowType
+import io.vertx.ext.web.client.WebClientOptions
 import io.vertx.ext.web.client.WebClientSession
 import io.vertx.ext.web.client.spi.CookieStore
 import io.vertx.ext.web.codec.BodyCodec
@@ -29,13 +30,12 @@ class ServerTest {
     @BeforeAll
     fun setUp(vertx: Vertx, context: VertxTestContext) {
 
+        val check = context.checkpoint(2)
+
         val oAuth = TestOAuth(vertx.delegate)
         val serverTokenPath = oAuth.tokenPath
 
-        vertx.deployVerticle(
-            HttpVerticle(oAuth),
-            context.completing()
-        )
+        vertx.deployVerticle(HttpVerticle(oAuth)) { check.flag() }
 
         val server = vertx.createHttpServer()
         val router = Router.router(vertx)
@@ -45,18 +45,18 @@ class ServerTest {
             // redirect to :
             // http://localhost:8080/callback?state=/welcome&code=<code>&scope=<scope>
             val state = URLEncoder.encode(rc.request().getParam("state"), "UTF-8")
-            log.info("request auth from state {0}", state)
+            println("request auth from state $state")
             rc.response().putHeader(
-                "location",
+                HttpHeaders.LOCATION,
                 "http://localhost:8080/callback?state=${state}&code=01234567890scope=read,profile:read_all"
             )
                 .setStatusCode(302)
-                .end("reroute")
+                .end()
         }
 
         router.post(serverTokenPath).handler(BodyHandler.create())
         router.post(serverTokenPath).handler { rc ->
-            log.info("request token with code {0}", rc.request().formAttributes().get("code"))
+            println("request token with code ${rc.request().formAttributes().get("code")}")
 
             val responseString = """
             { "token_type" : "Bearer",
@@ -72,17 +72,18 @@ class ServerTest {
 
         }
 
-        server.requestHandler(router).listen(8081)
+        server.requestHandler(router).listen(8081) { check.flag() }
     }
 
     @Test
     fun testMyApplication(vertx: Vertx, testContext: VertxTestContext) {
 
-        val client = WebClient.create(vertx)  //, WebClientOptions().setMaxRedirects(2))
+        val client = WebClient.create(vertx, WebClientOptions().setMaxRedirects(2))
         val session = WebClientSession.create(client.delegate, CookieStore.build())
 
         session.get(8080, "localhost", "/")
             .`as`(BodyCodec.string())
+            .followRedirects(true)
             .send(testContext.succeeding<io.vertx.ext.web.client.HttpResponse<String>> { response ->
                 testContext.verify {
                     assertThat(response.body()).isEqualTo("Hello World from Vert.x-Web!")
@@ -91,11 +92,6 @@ class ServerTest {
             })
 
     }
-
-    companion object {
-        private val log = LoggerFactory.getLogger(ServerTest::class.java)
-    }
-
 }
 
 

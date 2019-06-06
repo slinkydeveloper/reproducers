@@ -7,7 +7,11 @@ version '1.0-SNAPSHOT'
 
 
 repositories {
+    mavenLocal()
     mavenCentral()
+    maven {
+        url = 'http://oss.sonatype.org/content/repositories/snapshots/'
+    }
 }
 
 test {
@@ -15,7 +19,7 @@ test {
 }
 
 dependencies {
-    def vertxVersion="3.6.3"
+    def vertxVersion="4.0.0-SNAPSHOT"
 
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
 
